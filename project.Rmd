@@ -1,0 +1,111 @@
+---
+title: "Practical Machine Learning Project"
+author: "Peiran Chen"
+date: "17/06/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Data
+
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. 
+
+## Executive Summary
+- Load training and testing data
+- Subdivide training data for cross validation
+- Train data using different model
+- Predict on test data
+
+## Load training and testing data
+```{r}
+# load required libraries
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+# set seed for reproducibility
+set.seed(1234)
+# load training data and set NAs for missing values
+training <- read.csv("/Users/mq20120117/Documents/git-repo/practicalmachinelearning/data/pml-training.csv", na.strings=c("NA","#DIV/0!", ""))
+# load testing data and set NAs for missing values
+testing <- read.csv("/Users/mq20120117/Documents/git-repo/practicalmachinelearning/data/pml-testing.csv" , na.strings=c("NA","#DIV/0!", ""))
+
+# check str(training) and find many variables are NA. Remove them from data set
+# Some variables are not related with our model, such as X, user_name, raw_timestamp_part_1,
+# raw_timestamp_part_2, cvtd_timestamp, cvtd_timestamp, new_window and num_window, column 1-7
+training <- training[,colSums(is.na(training)) == 0]
+training <-training[,-c(1:7)]
+testing <- testing[,colSums(is.na(testing)) == 0]
+testing <- testing[,-c(1:7)]
+
+# Take a look at our data
+dim(training)
+head(training)
+dim(testing)
+head(testing)
+```
+
+## Subdivide training data for cross validation
+
+We have 19,622 observations in our training data set. And 20 observations in test data set.
+Subdivide training data set into sub-training and sub-testing.
+It will be random sampling without replacement
+```{r}
+sub.index <- createDataPartition(y=training$classe, p=0.75, list=FALSE)
+sub.training <- training[sub.index, ] 
+sub.testing <- training[-sub.index, ]
+dim(sub.training)
+dim(sub.testing)
+```
+
+## Train data using different model
+
+Check frequency of outcomes
+```{r}
+plot(sub.training$classe)
+```
+
+From the above chart, we know each category have the similar size in our testing data set.
+
+### Random forest model
+
+```{r}
+random.forest.model <- randomForest(classe ~. , data=sub.training, method="class")
+random.forest.predict <- predict(random.forest.model, sub.testing, type = "class")
+# test result
+confusionMatrix(random.forest.predict, sub.testing$classe)
+```
+
+### Decision tree model
+
+```{r}
+decision.tree.model <- rpart(classe ~ ., data=sub.training, method="class")
+decision.tree.predict <- predict(decision.tree.model, sub.testing, type = "class")
+# plot tree
+rpart.plot(decision.tree.model)
+# test result
+confusionMatrix(decision.tree.predict, sub.testing$classe)
+```
+
+By comparison, random forest model accuracy is 0.9953 vs. decision tree model accuracy is 0.7394. So we will choose random forest model.
+
+## Predict on test data
+
+We use the random forest model to predict our test data set.
+```{r}
+test.predict <- predict(random.forest.model, testing, type="class")
+test.predict
+```
